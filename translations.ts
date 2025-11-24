@@ -21,6 +21,9 @@ export const translations = {
     'base_currency': 'Ana Para Birimi',
     'base_currency_desc': 'Tüm raporlamalar bu para birimi üzerinden gösterilir.',
     'market_summary': 'Piyasa',
+    'privacy_mode': 'Gizlilik Modu',
+    'privacy_mode_on': 'Bakiye Gizlendi',
+    'privacy_mode_off': 'Bakiye Görünür',
     
     // Auth
     'login_title': 'Giriş Yap',
@@ -54,6 +57,10 @@ export const translations = {
     'test_notification': 'Bildirimi Test Et',
     'test_notification_sent': 'Test bildirimi gönderildi! (Tarayıcı iznini kontrol et)',
     'test_notification_fail': 'Bildirim gönderilemedi. Tarayıcı izinlerini kontrol et.',
+    'view_calendar': 'Takvim Görünümü',
+    'view_grid': 'Kart Görünümü',
+    'view_list': 'Liste Görünümü',
+    'today': 'Bugün',
 
     // Subscription Form
     'new_subscription': 'Yeni Abonelik Ekle',
@@ -71,6 +78,12 @@ export const translations = {
     'delete_success': 'Abonelik silindi 🗑️',
     'renewal_success': 'Ödeme kaydedildi: {services} ✅',
     'undo_payment_success': 'Ödeme geri alındı ↩️',
+    'shared_subscription': 'Ortak Abonelik',
+    'shared_with': 'Kişi ile paylaşılıyor',
+    'my_share': 'Sizin Payınız',
+    'total_price': 'Toplam Tutar',
+    'add_to_calendar': 'Takvime Ekle',
+    'how_to_cancel': 'Nasıl İptal Ederim?',
     
     // Categories
     'cat_entertainment': 'Eğlence',
@@ -143,6 +156,8 @@ export const translations = {
     'budget_settings': 'Bütçe Hedefleri',
     'monthly_budget': 'Aylık Bütçe Limiti',
     'budget_desc': 'Aylık harcama hedefini belirle, limiti aşarsan seni uyaralım.',
+    'theme': 'Tema',
+    'theme_desc': 'Uygulamanın vurgu rengini seçin.',
     
     // Settings Tabs
     'settings_tab_account': 'Hesap & Uygulama',
@@ -209,6 +224,14 @@ export const translations = {
     'mark_as_paid': 'Ödedim',
     'remind_later': 'Daha Sonra',
     'due_date': 'Vade',
+    
+    // Cancellation
+    'cancel_guide_title': 'İptal Rehberi',
+    'cancel_guide_desc': '{service} aboneliğini iptal etmek için aşağıdaki adımları izleyin.',
+    'generic_cancel_step': 'Web sitesine gidin ve hesabınıza giriş yapın.',
+    'generic_cancel_step_2': 'Ayarlar veya Aboneliklerim menüsünü bulun.',
+    'generic_cancel_step_3': 'İptal Et veya Üyeliği Sonlandır seçeneğine tıklayın.',
+    'step': 'Adım',
   },
   en: {
     // General
@@ -228,6 +251,9 @@ export const translations = {
     'base_currency': 'Base Currency',
     'base_currency_desc': 'All reports will be shown in this currency.',
     'market_summary': 'Markets',
+    'privacy_mode': 'Privacy Mode',
+    'privacy_mode_on': 'Balance Hidden',
+    'privacy_mode_off': 'Balance Visible',
 
     // Auth
     'login_title': 'Log In',
@@ -261,6 +287,10 @@ export const translations = {
     'test_notification': 'Test Notification',
     'test_notification_sent': 'Test notification sent! (Check permissions)',
     'test_notification_fail': 'Failed to send notification. Check browser permissions.',
+    'view_calendar': 'Calendar View',
+    'view_grid': 'Grid View',
+    'view_list': 'List View',
+    'today': 'Today',
 
     // Subscription Form
     'new_subscription': 'Add New Subscription',
@@ -278,6 +308,12 @@ export const translations = {
     'delete_success': 'Subscription deleted 🗑️',
     'renewal_success': 'Payment recorded: {services} ✅',
     'undo_payment_success': 'Payment reverted ↩️',
+    'shared_subscription': 'Shared Subscription',
+    'shared_with': 'Sharing with',
+    'my_share': 'My Share',
+    'total_price': 'Total Price',
+    'add_to_calendar': 'Add to Calendar',
+    'how_to_cancel': 'How to Cancel?',
 
     // Categories
     'cat_entertainment': 'Entertainment',
@@ -350,6 +386,8 @@ export const translations = {
     'budget_settings': 'Budget Goals',
     'monthly_budget': 'Monthly Budget Limit',
     'budget_desc': 'Set a monthly spending target and we\'ll alert you if you exceed it.',
+    'theme': 'Theme',
+    'theme_desc': 'Choose the accent color for the application.',
     
     // Settings Tabs
     'settings_tab_account': 'Account & App',
@@ -416,5 +454,14 @@ export const translations = {
     'mark_as_paid': 'Mark as Paid',
     'remind_later': 'Remind Later',
     'due_date': 'Due Date',
+
+    // Cancellation
+    'cancel_guide_title': 'Cancellation Guide',
+    'cancel_guide_desc': 'Follow these steps to cancel your {service} subscription.',
+    'generic_cancel_step': 'Go to the website and log in to your account.',
+    'generic_cancel_step_2': 'Find Settings or My Subscriptions menu.',
+    'generic_cancel_step_3': 'Click on Cancel Subscription or End Membership.',
+    'step': 'Step',
   }
 };
+    

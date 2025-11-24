@@ -4,7 +4,8 @@ import React, { useRef, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import { PlanType, Currency } from '../types';
-import { RefreshCw, User, Database, Download, Upload, FileJson, FileSpreadsheet, Plus, X, Tag, DollarSign, Bell, Coins, Wallet, UserCog } from 'lucide-react';
+import { RefreshCw, User, Database, Download, Upload, FileJson, FileSpreadsheet, Plus, X, Tag, DollarSign, Bell, Coins, Wallet, UserCog, Palette } from 'lucide-react';
+import { THEME_COLORS } from '../constants';
 
 type SettingsTab = 'account' | 'finance' | 'categories' | 'data';
 
@@ -12,7 +13,7 @@ export const Settings: React.FC = () => {
   const { 
     user, downgradeToFree, upgradeToPremium, language, setLanguage, t, 
     exportData, importData, addCategory, removeCategory, updateBudget, requestNotificationPermission,
-    setBaseCurrency, exchangeRates, refreshRates
+    setBaseCurrency, exchangeRates, refreshRates, setTheme
   } = useApp();
   
   const { addToast } = useToast();
@@ -144,6 +145,27 @@ export const Settings: React.FC = () => {
         <div className="bg-surface rounded-2xl shadow-sm border border-white/10 p-6">
           <h3 className="text-lg font-bold text-white mb-4">{t('app_preferences')}</h3>
           
+          {/* Theme Selection */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between py-3 border-b border-white/5 gap-4">
+             <div>
+                <p className="font-medium text-white flex items-center gap-2">
+                   <Palette size={14} className="text-primary" /> {t('theme')}
+                </p>
+                <p className="text-xs text-gray-500">{t('theme_desc')}</p>
+             </div>
+             <div className="flex gap-2">
+                {THEME_COLORS.map(theme => (
+                  <button
+                    key={theme.id}
+                    onClick={() => setTheme(theme.id)}
+                    className={`w-8 h-8 rounded-full border-2 transition-all transform hover:scale-110 ${user.themeColor === theme.id ? 'border-white scale-110' : 'border-transparent'}`}
+                    style={{ backgroundColor: theme.hex }}
+                    title={theme.name}
+                  />
+                ))}
+             </div>
+          </div>
+
           <div className="flex items-center justify-between py-3 border-b border-white/5">
             <div>
               <p className="font-medium text-white flex items-center gap-2">

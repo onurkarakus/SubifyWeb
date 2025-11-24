@@ -10,6 +10,14 @@ export const CURRENCY_SYMBOLS: Record<Currency, string> = {
 // Deprecated: Use CURRENCY_SYMBOLS[user.currency] instead
 export const CURRENCY_SYMBOL = '₺';
 
+export const THEME_COLORS = [
+  { id: 'purple', name: 'Royal Purple', rgb: '138, 43, 226', hex: '#8A2BE2' },
+  { id: 'blue', name: 'Ocean Blue', rgb: '59, 130, 246', hex: '#3B82F6' },
+  { id: 'green', name: 'Emerald Green', rgb: '34, 197, 94', hex: '#22C55E' },
+  { id: 'orange', name: 'Sunset Orange', rgb: '249, 115, 22', hex: '#F97316' },
+  { id: 'pink', name: 'Hot Pink', rgb: '236, 72, 153', hex: '#EC4899' },
+];
+
 export const DEFAULT_CATEGORY_COLORS: Record<string, string> = {
   [DefaultCategory.ENTERTAINMENT]: '#F472B6', // Pink
   [DefaultCategory.SOFTWARE]: '#60A5FA', // Blue
@@ -33,6 +41,39 @@ export const getCategoryColorHex = (category: string): string => {
   return `hsl(${h}, 70%, 60%)`; 
 };
 
+// Helper to attempt fetching a brand logo
+export const getBrandLogo = (name: string): string => {
+  // Simple heuristic: remove spaces, lowercase, add .com
+  // Ideally this would come from the backend or user input
+  const cleanName = name.toLowerCase().replace(/\s+/g, '');
+  
+  // Manual overrides for popular services that might have weird domains or need specific help
+  const domainMap: Record<string, string> = {
+    'netflix': 'netflix.com',
+    'spotify': 'spotify.com',
+    'adobe': 'adobe.com',
+    'aws': 'aws.amazon.com',
+    'amazon': 'amazon.com',
+    'google': 'google.com',
+    'apple': 'apple.com',
+    'applemusic': 'apple.com',
+    'youtube': 'youtube.com',
+    'disney': 'disneyplus.com',
+    'disney+': 'disneyplus.com',
+    'github': 'github.com',
+    'figma': 'figma.com',
+    'notion': 'notion.so',
+    'chatgpt': 'openai.com',
+    'openai': 'openai.com',
+    'exxen': 'exxen.com',
+    'blutv': 'blutv.com',
+    'duolingo': 'duolingo.com'
+  };
+
+  const domain = domainMap[cleanName] || `${cleanName}.com`;
+  return `https://logo.clearbit.com/${domain}`;
+};
+
 export const MOCK_SUBSCRIPTIONS = [
   {
     id: '1',
@@ -43,7 +84,8 @@ export const MOCK_SUBSCRIPTIONS = [
     category: DefaultCategory.ENTERTAINMENT,
     nextRenewalDate: '2023-11-20',
     lastUsedDate: '2023-11-18',
-    paymentHistory: []
+    paymentHistory: [],
+    sharedWith: 0
   },
   {
     id: '2',
@@ -54,7 +96,8 @@ export const MOCK_SUBSCRIPTIONS = [
     category: DefaultCategory.MUSIC,
     nextRenewalDate: '2023-11-25',
     lastUsedDate: '2023-11-01',
-    paymentHistory: []
+    paymentHistory: [],
+    sharedWith: 0
   },
   {
     id: '3',
@@ -65,7 +108,8 @@ export const MOCK_SUBSCRIPTIONS = [
     category: DefaultCategory.MUSIC,
     nextRenewalDate: '2025-12-19',
     lastUsedDate: '2025-12-01',
-    paymentHistory: []
+    paymentHistory: [],
+    sharedWith: 0
   }
 ];
 

@@ -39,6 +39,8 @@ export const RenewalModal: React.FC<RenewalModalProps> = ({ overdueSubscriptions
     }
   };
 
+  const privacyClass = user.privacyMode ? 'blur-sm select-none' : '';
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
       <div className="bg-surface border border-white/10 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-fade-in-up">
@@ -64,7 +66,7 @@ export const RenewalModal: React.FC<RenewalModalProps> = ({ overdueSubscriptions
                 </div>
                 <div>
                   <h4 className="font-bold text-white">{sub.name}</h4>
-                  <div className="flex items-center gap-2 text-xs text-gray-400">
+                  <div className={`flex items-center gap-2 text-xs text-gray-400 ${privacyClass}`}>
                     <span className="bg-white/5 px-2 py-0.5 rounded text-xs flex items-center gap-1">
                       {sub.price} {sub.currency || CURRENCY_SYMBOL}
                       {sub.currency !== user.currency && (

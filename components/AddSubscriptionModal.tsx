@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import { BillingCycle, Subscription, Currency, DefaultCategory } from '../types';
-import { X, ChevronDown, Search } from 'lucide-react';
+import { X, ChevronDown, Search, Users } from 'lucide-react';
 import { POPULAR_PLATFORMS } from '../constants';
 
 interface AddSubscriptionModalProps {
@@ -14,7 +14,7 @@ interface AddSubscriptionModalProps {
 }
 
 export const AddSubscriptionModal: React.FC<AddSubscriptionModalProps> = ({ isOpen, onClose, subscriptionToEdit }) => {
-  const { addSubscription, updateSubscription, t, categories } = useApp();
+  const { addSubscription, updateSubscription, t, categories, currencySymbol } = useApp();
   const { addToast } = useToast();
   
   const [formData, setFormData] = useState({
@@ -23,7 +23,8 @@ export const AddSubscriptionModal: React.FC<AddSubscriptionModalProps> = ({ isOp
     currency: 'TRY' as Currency,
     category: DefaultCategory.ENTERTAINMENT as string,
     cycle: BillingCycle.MONTHLY,
-    nextRenewalDate: new Date().toISOString().split('T')[0] // today
+    nextRenewalDate: new Date().toISOString().split('T')[0], // today
+    sharedWith: 0
   });
 
   // Reset or Populate form when modal opens or subscriptionToEdit changes
@@ -35,7 +36,8 @@ export const AddSubscriptionModal: React.FC<AddSubscriptionModalProps> = ({ isOp
         currency: subscriptionToEdit.currency || 'TRY',
         category: subscriptionToEdit.category,
         cycle: subscriptionToEdit.cycle,
-        nextRenewalDate: subscriptionToEdit.nextRenewalDate
+        nextRenewalDate: subscriptionToEdit.nextRenewalDate,
+        sharedWith: subscriptionToEdit.sharedWith || 0
       });
     } else {
       // Reset
@@ -45,7 +47,8 @@ export const AddSubscriptionModal: React.FC<AddSubscriptionModalProps> = ({ isOp
         currency: 'TRY',
         category: DefaultCategory.ENTERTAINMENT,
         cycle: BillingCycle.MONTHLY,
-        nextRenewalDate: new Date().toISOString().split('T')[0]
+        nextRenewalDate: new Date().toISOString().split('T')[0],
+        sharedWith: 0
       });
     }
   }, [subscriptionToEdit, isOpen]);
@@ -90,7 +93,8 @@ export const AddSubscriptionModal: React.FC<AddSubscriptionModalProps> = ({ isOp
         currency: formData.currency,
         category: formData.category,
         cycle: formData.cycle,
-        nextRenewalDate: formData.nextRenewalDate
+        nextRenewalDate: formData.nextRenewalDate,
+        sharedWith: formData.sharedWith
       });
       addToast(t('edit_success') || 'Abonelik güncellendi', 'success');
       onClose();
@@ -102,7 +106,8 @@ export const AddSubscriptionModal: React.FC<AddSubscriptionModalProps> = ({ isOp
         currency: formData.currency,
         category: formData.category,
         cycle: formData.cycle,
-        nextRenewalDate: formData.nextRenewalDate
+        nextRenewalDate: formData.nextRenewalDate,
+        sharedWith: formData.sharedWith
       });
 
       if (success) {
@@ -113,7 +118,8 @@ export const AddSubscriptionModal: React.FC<AddSubscriptionModalProps> = ({ isOp
           currency: 'TRY',
           category: DefaultCategory.ENTERTAINMENT,
           cycle: BillingCycle.MONTHLY,
-          nextRenewalDate: new Date().toISOString().split('T')[0]
+          nextRenewalDate: new Date().toISOString().split('T')[0],
+          sharedWith: 0
         });
         onClose();
       } else {
@@ -121,6 +127,10 @@ export const AddSubscriptionModal: React.FC<AddSubscriptionModalProps> = ({ isOp
       }
     }
   };
+  
+  // Calculate share for preview
+  const total = parseFloat(formData.price) || 0;
+  const myShare = total / (formData.sharedWith + 1);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
@@ -209,6 +219,39 @@ export const AddSubscriptionModal: React.FC<AddSubscriptionModalProps> = ({ isOp
                 <option value={BillingCycle.YEARLY}>{t('yearly')}</option>
               </select>
             </div>
+          </div>
+
+          {/* Shared Subscription Section */}
+          <div>
+             <label className="block text-sm font-medium text-gray-400 mb-1 flex items-center gap-2">
+                <Users size={16} /> {t('shared_subscription')}
+             </label>
+             <div className="bg-dark border border-white/10 rounded-xl p-3 flex items-center justify-between">
+                <span className="text-sm text-gray-300">{t('shared_with')}</span>
+                <div className="flex items-center gap-3">
+                    <button 
+                        type="button"
+                        onClick={() => setFormData(prev => ({...prev, sharedWith: Math.max(0, prev.sharedWith - 1)}))}
+                        className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-white"
+                    >
+                        -
+                    </button>
+                    <span className="font-bold text-white w-4 text-center">{formData.sharedWith}</span>
+                    <button 
+                        type="button"
+                        onClick={() => setFormData(prev => ({...prev, sharedWith: prev.sharedWith + 1}))}
+                        className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-white"
+                    >
+                        +
+                    </button>
+                </div>
+             </div>
+             {formData.sharedWith > 0 && (
+                 <div className="mt-2 text-right text-xs text-gray-400 flex justify-between px-1">
+                    <span>{t('total_price')}: {total}</span>
+                    <span className="text-primary font-bold">{t('my_share')}: {myShare.toFixed(2)}</span>
+                 </div>
+             )}
           </div>
 
           <div>

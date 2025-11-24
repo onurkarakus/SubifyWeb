@@ -60,6 +60,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onClose }) => {
   };
 
   const marketTargets = getTargetCurrencies().slice(0, 3); // Show max 3
+  const privacyClass = user.privacyMode ? 'blur-sm select-none' : '';
 
   const NavItem = ({ path, icon, label, badge }: { path: string; icon: React.ReactNode; label: string; badge?: number }) => (
     <button
@@ -129,7 +130,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onClose }) => {
                 <RefreshCw size={10} />
               </button>
            </div>
-           <div className="space-y-1.5">
+           <div className={`space-y-1.5 ${privacyClass}`}>
               {marketTargets.map(code => (
                  <div key={code} className="flex justify-between items-center text-xs">
                     <div className="flex items-center gap-1.5">

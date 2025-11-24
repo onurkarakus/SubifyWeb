@@ -1,6 +1,5 @@
 
 
-
 import React from 'react';
 import { Subscription } from '../types';
 import { useApp } from '../context/AppContext';
@@ -15,15 +14,12 @@ interface PaymentHistoryModalProps {
 }
 
 export const PaymentHistoryModal: React.FC<PaymentHistoryModalProps> = ({ isOpen, onClose, subscription }) => {
-  const { t, revertLastPayment } = useApp();
+  const { t, revertLastPayment, user } = useApp();
   const { addToast } = useToast();
 
   if (!isOpen || !subscription) return null;
 
   // Sort history by date (newest first)
-  // Note: Logic in AppContext assumes history is stored chronologically (push). 
-  // So last element in array is newest.
-  // Here we reverse for display, so index 0 is newest.
   const history = [...(subscription.paymentHistory || [])].sort((a, b) => 
     new Date(b.date).getTime() - new Date(a.date).getTime()
   );
@@ -31,8 +27,10 @@ export const PaymentHistoryModal: React.FC<PaymentHistoryModalProps> = ({ isOpen
   const handleUndo = () => {
     revertLastPayment(subscription.id);
     addToast(t('undo_payment_success'), 'success');
-    onClose(); // Close modal to refresh state easily or just let react handle it
+    onClose(); 
   };
+  
+  const privacyClass = user.privacyMode ? 'blur-sm select-none' : '';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
@@ -76,7 +74,7 @@ export const PaymentHistoryModal: React.FC<PaymentHistoryModalProps> = ({ isOpen
                                {t('status_paid')}
                              </p>
                           </div>
-                          <div className="text-right">
+                          <div className={`text-right ${privacyClass}`}>
                              <p className="text-white font-bold">
                                {record.amount} {record.currency || CURRENCY_SYMBOL}
                              </p>

@@ -1,7 +1,8 @@
 
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Subscription, UserProfile, PlanType, AIResult, BillingCycle, DefaultCategory, PaymentRecord, Currency } from '../types';
-import { MOCK_SUBSCRIPTIONS, CURRENCY_SYMBOLS } from '../constants';
+import { MOCK_SUBSCRIPTIONS, CURRENCY_SYMBOLS, THEME_COLORS } from '../constants';
 import { translations, Language } from '../translations';
 
 interface AppContextProps {
@@ -42,6 +43,14 @@ interface AppContextProps {
   convertAmount: (amount: number, fromCurrency: Currency) => number;
   exchangeRates: Record<string, number>;
   refreshRates: () => Promise<void>;
+  // Privacy
+  togglePrivacyMode: () => void;
+  // Theme
+  setTheme: (themeId: string) => void;
+  // Shared
+  calculateMyShare: (sub: Subscription) => number;
+  // Calendar Export
+  downloadCalendarEvent: (sub: Subscription) => void;
 }
 
 const AppContext = createContext<AppContextProps | undefined>(undefined);
@@ -54,7 +63,9 @@ const DEFAULT_USER: UserProfile = {
   currency: 'TRY',
   customCategories: [],
   monthlyBudget: 0,
-  notificationsEnabled: false
+  notificationsEnabled: false,
+  privacyMode: false,
+  themeColor: 'purple'
 };
 
 const MOCK_USER: UserProfile = {
@@ -65,7 +76,9 @@ const MOCK_USER: UserProfile = {
   currency: 'TRY',
   customCategories: [],
   monthlyBudget: 2500,
-  notificationsEnabled: false
+  notificationsEnabled: false,
+  privacyMode: false,
+  themeColor: 'purple'
 };
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -80,6 +93,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // Exchange Rates State
   const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({ TRY: 1, USD: 1, EUR: 1 });
+
+  // --- Theme Logic ---
+  const setTheme = (themeId: string) => {
+    setUser(prev => ({ ...prev, themeColor: themeId }));
+    const theme = THEME_COLORS.find(t => t.id === themeId);
+    if (theme) {
+      document.documentElement.style.setProperty('--color-primary', theme.rgb);
+    }
+  };
+
+  useEffect(() => {
+    // Apply theme on load
+    if (user.themeColor) {
+      const theme = THEME_COLORS.find(t => t.id === user.themeColor);
+      if (theme) {
+        document.documentElement.style.setProperty('--color-primary', theme.rgb);
+      }
+    }
+  }, [user.themeColor]);
 
   // --- Exchange Rate Logic ---
   const refreshRates = async () => {
@@ -103,16 +135,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Convert any amount to the user's base currency
   const convertAmount = (amount: number, fromCurrency: Currency): number => {
     if (fromCurrency === user.currency) return amount;
-    // Since rates are fetched relative to user.currency, the rate for fromCurrency is actually 1 unit of user.currency = X units of fromCurrency?
-    // Wait, exchangerate-api/v4/latest/TRY returns: "USD": 0.03 (1 TRY = 0.03 USD).
-    // So if I have 10 USD, and base is TRY. I need to divide by the rate? 
-    // No, standard API response: Base = TRY. Rates: USD = 0.03.
-    // 1 TRY = 0.03 USD. -> 1 USD = 1/0.03 TRY.
-    // So Amount(USD) / Rate(USD) = Amount(TRY).
-    
     const rate = exchangeRates[fromCurrency];
     if (!rate) return amount;
     return amount / rate;
+  };
+  
+  // Calculate user's share based on split count
+  const calculateMyShare = (sub: Subscription): number => {
+      const totalAmount = sub.price;
+      const dividers = (sub.sharedWith || 0) + 1;
+      return totalAmount / dividers;
   };
 
   useEffect(() => {
@@ -155,7 +187,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             currency: parsedUser.currency || 'TRY',
             customCategories: parsedUser.customCategories || [],
             monthlyBudget: parsedUser.monthlyBudget || 0,
-            notificationsEnabled: parsedUser.notificationsEnabled || false
+            notificationsEnabled: parsedUser.notificationsEnabled || false,
+            privacyMode: parsedUser.privacyMode || false,
+            themeColor: parsedUser.themeColor || 'purple'
         });
       } else {
         setUser(MOCK_USER);
@@ -170,7 +204,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 // Fallback for missing renewal date
                 nextRenewalDate: sub.nextRenewalDate || new Date().toISOString().split('T')[0],
                 // Fallback for missing payment history
-                paymentHistory: Array.isArray(sub.paymentHistory) ? sub.paymentHistory : []
+                paymentHistory: Array.isArray(sub.paymentHistory) ? sub.paymentHistory : [],
+                sharedWith: sub.sharedWith || 0
             })) : MOCK_SUBSCRIPTIONS as unknown as Subscription[];
             
             setSubscriptions(sanitizedSubs);
@@ -225,6 +260,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const setBaseCurrency = (currency: Currency) => {
       setUser(prev => ({...prev, currency}));
       // Will trigger useEffect to refresh rates
+  };
+  
+  const togglePrivacyMode = () => {
+    setUser(prev => ({ ...prev, privacyMode: !prev.privacyMode }));
   };
 
   // Translation Helper
@@ -292,7 +331,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const renewalDate = new Date(sub.nextRenewalDate);
         const oldDateStr = sub.nextRenewalDate;
         
-        // 1. Record the payment in history
+        // 1. Record the payment in history (FULL AMOUNT for history tracking, even if shared)
         const newPaymentRecord: PaymentRecord = {
             date: oldDateStr,
             amount: sub.price,
@@ -376,7 +415,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const newSub: Subscription = {
       ...subData,
       id: Math.random().toString(36).substr(2, 9),
-      paymentHistory: []
+      paymentHistory: [],
+      sharedWith: subData.sharedWith || 0
     };
     setSubscriptions(prev => [...prev, newSub]);
     return true;
@@ -399,7 +439,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setUser(prev => ({ ...prev, plan: PlanType.FREE }));
   };
 
-  // Simulate AI Processing Delay
+  // Real AI Analysis based on User Data
   const generateAIAnalysis = async (): Promise<AIResult> => {
     if (user.plan === PlanType.FREE) {
        throw new Error("Premium Only");
@@ -407,39 +447,52 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     
     return new Promise((resolve) => {
       setTimeout(() => {
+        // Calculate Top Category
+        const catMap: Record<string, number> = {};
+        subscriptions.forEach(sub => {
+            const val = convertAmount(sub.price, sub.currency);
+            const cycleAdj = sub.cycle === 'yearly' ? val/12 : sub.cycle === 'quarterly' ? val/3 : val;
+            catMap[sub.category] = (catMap[sub.category] || 0) + cycleAdj;
+        });
+        const topCat = Object.keys(catMap).sort((a,b) => catMap[b] - catMap[a])[0];
+        const topCatSpend = topCat ? catMap[topCat] : 0;
+        const total = Object.values(catMap).reduce((a,b) => a+b, 0);
+        const percent = total > 0 ? (topCatSpend/total * 100).toFixed(0) : 0;
+        
         const symbol = CURRENCY_SYMBOLS[user.currency];
-        const summary = language === 'tr' 
-          ? `Bu ay aboneliklere toplam ${totalMonthlySpend.toFixed(0)} ${symbol} harcadın.`
-          : `You spent a total of ${totalMonthlySpend.toFixed(0)} ${symbol} on subscriptions this month.`;
 
-        const tips = language === 'tr' 
-          ? [
-            "Disney+ son 45 gündür kullanılmamış, dondurmayı düşünebilirsin.",
-            "Spotify ve YouTube Music birlikte aylık yük oluşturuyor. En çok hangisini kullanıyorsan onu bırakmak mantıklı olabilir.",
-            "Yazılım aboneliklerinde yıllık ödeme ile %20 tasarruf edebilirsin."
-          ]
-          : [
-            "You haven't used Disney+ for 45 days, consider pausing it.",
-            "Spotify and YouTube Music are stacking up. Consider keeping only the one you use most.",
-            "You could save 20% on software subscriptions by switching to yearly billing."
-          ];
+        const summary = language === 'tr' 
+          ? `Toplam harcamanın %${percent}'si ${topCat ? (t(`cat_${topCat}` as any) || topCat) : 'bilinmeyen'} kategorisine gidiyor.`
+          : `${percent}% of your total spending goes to ${topCat || 'unknown'}.`;
+
+        // Generate Tips based on Data
+        const tips = [];
+        if (language === 'tr') {
+            if (subscriptions.length > 5) tips.push(`${subscriptions.length} farklı aboneliğin var. Bazılarını birleştirmeyi düşündün mü?`);
+            if (topCatSpend > 500) tips.push(`${topCat} kategorisinde tasarruf potansiyelin yüksek.`);
+            tips.push("Yıllık ödeme planları genellikle %20 daha ucuzdur. Kontrol etmeye değer.");
+        } else {
+            if (subscriptions.length > 5) tips.push(`You have ${subscriptions.length} active subscriptions. Consider consolidating.`);
+            if (topCatSpend > 500) tips.push(`High saving potential in ${topCat}.`);
+            tips.push("Yearly plans are usually 20% cheaper. Worth checking out.");
+        }
 
         resolve({
           summary,
           tips,
-          estimatedSavings: Math.floor(Math.random() * 200) + 50 
+          estimatedSavings: Math.floor(total * 0.15) // Assume 15% saving potential
         });
       }, 2500); 
     });
   };
 
-  // --- Calculations using Dynamic Conversion ---
+  // --- Calculations using Dynamic Conversion AND Shared Cost ---
   const totalMonthlySpend = subscriptions.reduce((acc, sub) => {
-    let price = sub.price;
+    let price = calculateMyShare(sub); // Use MY SHARE
     
     // Cycle normalization
-    if (sub.cycle === BillingCycle.YEARLY) price = sub.price / 12;
-    if (sub.cycle === BillingCycle.QUARTERLY) price = sub.price / 3;
+    if (sub.cycle === BillingCycle.YEARLY) price = price / 12;
+    if (sub.cycle === BillingCycle.QUARTERLY) price = price / 3;
     
     // Currency normalization to User Base Currency using LIVE rates
     return acc + convertAmount(price, sub.currency);
@@ -464,8 +517,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
        });
        
        paidInMonth.forEach(record => {
-           // Normalize currency to User Base
-           paidTotal += convertAmount(record.amount, record.currency);
+           // For past records, we assume the shared ratio was the same. 
+           // In a real app, history should store the 'share' at that moment.
+           // Here we calculate derived share for simplicity.
+           const sharedAmount = record.amount / ((sub.sharedWith || 0) + 1);
+           paidTotal += convertAmount(sharedAmount, record.currency);
        });
 
        // 2. Calculate PENDING amount based on nextRenewalDate
@@ -474,8 +530,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
          
          // Check if next renewal is in current month
          if ((nm - 1) === currentMonth && ny === currentYear) {
-             // Only count full price for pending, converted
-             pendingTotal += convertAmount(sub.price, sub.currency);
+             const myShare = calculateMyShare(sub);
+             pendingTotal += convertAmount(myShare, sub.currency);
          }
        }
     });
@@ -496,6 +552,31 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return false;
   }
 
+  // --- ICS Export Feature ---
+  const downloadCalendarEvent = (sub: Subscription) => {
+     // Create a basic ICS event
+     const dateStr = sub.nextRenewalDate.replace(/-/g, '');
+     const event = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'BEGIN:VEVENT',
+        `SUMMARY:Renew ${sub.name}`,
+        `DTSTART;VALUE=DATE:${dateStr}`,
+        `DESCRIPTION:Price: ${sub.price} ${sub.currency}. Reminder from Subify.`,
+        'END:VEVENT',
+        'END:VCALENDAR'
+     ].join('\n');
+     
+     const blob = new Blob([event], { type: 'text/calendar;charset=utf-8' });
+     const url = URL.createObjectURL(blob);
+     const link = document.createElement('a');
+     link.href = url;
+     link.download = `${sub.name}_reminder.ics`;
+     document.body.appendChild(link);
+     link.click();
+     document.body.removeChild(link);
+  };
+
   // --- Data Management ---
   const exportData = (format: 'json' | 'csv') => {
     let content = '';
@@ -514,7 +595,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       extension = 'json';
     } else {
       // CSV Export
-      const headers = ['Name', 'Price', 'Currency', 'Cycle', 'Category', 'NextRenewalDate', 'Description'];
+      const headers = ['Name', 'Price', 'Currency', 'Cycle', 'Category', 'NextRenewalDate', 'SharedWith'];
       const rows = subscriptions.map(sub => [
         `"${sub.name.replace(/"/g, '""')}"`, // Escape quotes
         sub.price,
@@ -522,7 +603,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         sub.cycle,
         sub.category,
         sub.nextRenewalDate,
-        `"${(sub.id).substring(0,6)}"`
+        sub.sharedWith || 0
       ]);
       
       const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
@@ -554,7 +635,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           const sanitizedSubs = data.subscriptions.map((sub: any) => ({
               ...sub,
               nextRenewalDate: sub.nextRenewalDate || new Date().toISOString().split('T')[0],
-              paymentHistory: Array.isArray(sub.paymentHistory) ? sub.paymentHistory : []
+              paymentHistory: Array.isArray(sub.paymentHistory) ? sub.paymentHistory : [],
+              sharedWith: sub.sharedWith || 0
           }));
           setSubscriptions(sanitizedSubs);
           
@@ -570,10 +652,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const lines = content.split(/\r\n|\n/).filter(line => line.trim() !== '');
       if (lines.length < 2) return false; // Need headers and at least one row
 
-      const headers = lines[0].split(',');
-      // Basic CSV Validation check
-      if (!headers[0].toLowerCase().includes('name')) return false;
-
       const newSubs: Subscription[] = [];
       
       for (let i = 1; i < lines.length; i++) {
@@ -588,6 +666,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           const cycle = (cols[3] || BillingCycle.MONTHLY) as any;
           const category = (cols[4] || DefaultCategory.OTHER) as any;
           const nextRenewalDate = cols[5] || new Date().toISOString().split('T')[0];
+          const sharedWith = parseInt(cols[6] || '0');
 
           newSubs.push({
              id: Math.random().toString(36).substr(2, 9),
@@ -597,7 +676,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
              cycle,
              category,
              nextRenewalDate,
-             paymentHistory: []
+             paymentHistory: [],
+             sharedWith
           });
       }
 
@@ -615,8 +695,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
-  // --- New Features Logic ---
-  
   const addCategory = (name: string) => {
     if (!user.customCategories?.includes(name)) {
       setUser(prev => ({
@@ -693,7 +771,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setBaseCurrency,
       convertAmount,
       exchangeRates,
-      refreshRates
+      refreshRates,
+      togglePrivacyMode,
+      setTheme,
+      calculateMyShare,
+      downloadCalendarEvent
     }}>
       {children}
     </AppContext.Provider>

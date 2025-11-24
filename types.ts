@@ -38,6 +38,7 @@ export interface Subscription {
   lastUsedDate?: string; // Optional for advanced AI logic
   logoUrl?: string;
   paymentHistory: PaymentRecord[]; 
+  sharedWith?: number; // Number of people sharing (0 means just me)
 }
 
 export interface AIResult {
@@ -55,4 +56,6 @@ export interface UserProfile {
   monthlyBudget?: number; // New: Budget Goal
   customCategories?: string[]; // New: User defined categories
   notificationsEnabled?: boolean; // New: Notification preference
+  privacyMode?: boolean; // New: Blur sensitive data
+  themeColor?: string; // New: 'purple', 'blue', 'green', 'orange', 'pink'
 }

@@ -9,6 +9,12 @@
     <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
+    <style>
+      :root {
+        /* Default Purple: 138, 43, 226 */
+        --color-primary: 138, 43, 226;
+      }
+    </style>
     <script>
       tailwind.config = {
         darkMode: 'class',
@@ -18,8 +24,8 @@
               sans: ['Manrope', 'sans-serif'],
             },
             colors: {
-              primary: '#8A2BE2', // Purple from reference
-              'primary-hover': '#7A26C9',
+              primary: 'rgba(var(--color-primary), <alpha-value>)', 
+              'primary-hover': 'rgba(var(--color-primary), 0.8)', // slightly transparent as hover
               secondary: '#18C4C1',
               success: '#22C55E',
               warning: '#FACC15',

@@ -3,26 +3,29 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
-import { Plus, MoreVertical, Grid, List as ListIcon, Filter, SortAsc, Trash2, AlertTriangle, Pencil, Calendar, DollarSign, Type, ChevronLeft, ChevronRight, Clock, Info } from 'lucide-react';
+import { Plus, MoreVertical, Grid, List as ListIcon, Filter, SortAsc, Trash2, AlertTriangle, Pencil, Calendar, DollarSign, Type, ChevronLeft, ChevronRight, Clock, Info, Eye, EyeOff, Users, CalendarDays } from 'lucide-react';
 import { AddSubscriptionModal } from '../components/AddSubscriptionModal';
 import { AISection } from '../components/AISection';
-import { getCategoryColorHex, CURRENCY_SYMBOLS } from '../constants';
+import { getCategoryColorHex, CURRENCY_SYMBOLS, getBrandLogo } from '../constants';
 import { BarChart, Bar, XAxis, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import { Subscription, BillingCycle, DefaultCategory } from '../types';
 
 export const Dashboard: React.FC = () => {
-  const { user, subscriptions, totalMonthlySpend, removeSubscription, renewSubscription, t, categories, currencySymbol, convertAmount } = useApp();
+  const { user, subscriptions, totalMonthlySpend, removeSubscription, renewSubscription, t, categories, currencySymbol, convertAmount, togglePrivacyMode, calculateMyShare } = useApp();
   const { addToast } = useToast();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   
   // View & Filter States
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'calendar'>('grid');
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [sortType, setSortType] = useState<'date' | 'price' | 'name'>('date');
   
+  // Calendar State
+  const [currentCalendarDate, setCurrentCalendarDate] = useState(new Date());
+
   // Chart State
   const [chartView, setChartView] = useState<'monthly' | 'yearly'>('monthly');
 
@@ -118,7 +121,8 @@ export const Dashboard: React.FC = () => {
           const renewalDate = new Date(sub.nextRenewalDate);
           const renewalYear = renewalDate.getFullYear();
           const renewalMonth = renewalDate.getMonth();
-          const convertedPrice = convertAmount(sub.price, sub.currency);
+          const mySharePrice = calculateMyShare(sub); // Use My Share
+          const convertedPrice = convertAmount(mySharePrice, sub.currency);
 
           if (sub.cycle === BillingCycle.MONTHLY) {
             if (renewalYear < currentYear || (renewalYear === currentYear && renewalMonth <= monthIndex)) {
@@ -151,7 +155,8 @@ export const Dashboard: React.FC = () => {
           const renewalDate = new Date(sub.nextRenewalDate);
           const renewalYear = renewalDate.getFullYear();
           const renewalMonth = renewalDate.getMonth();
-          const convertedPrice = convertAmount(sub.price, sub.currency);
+          const mySharePrice = calculateMyShare(sub); // Use My Share
+          const convertedPrice = convertAmount(mySharePrice, sub.currency);
 
           if (sub.cycle === BillingCycle.MONTHLY) {
             if (renewalYear < year) {
@@ -176,17 +181,50 @@ export const Dashboard: React.FC = () => {
         return { name: year.toString(), value: yearTotal };
       });
     }
-  }, [subscriptions, chartView, convertAmount]);
+  }, [subscriptions, chartView, convertAmount, calculateMyShare]);
 
   const chartDisplayTotal = useMemo(() => {
     return chartData.reduce((acc, dataPoint) => acc + dataPoint.value, 0);
   }, [chartData]);
 
+  // --- Logic: Calendar Data ---
+  const getDaysInMonth = (year: number, month: number) => {
+    return new Date(year, month + 1, 0).getDate();
+  };
+  const getFirstDayOfMonth = (year: number, month: number) => {
+    // 0 = Sunday, but we want 0 = Monday for Euro style, so adjust
+    let day = new Date(year, month, 1).getDay();
+    // Convert Sunday (0) to 7, subtract 1 to make Monday (1) -> 0
+    return day === 0 ? 6 : day - 1;
+  };
+  
+  const calendarDays = useMemo(() => {
+    const year = currentCalendarDate.getFullYear();
+    const month = currentCalendarDate.getMonth();
+    const daysInMonth = getDaysInMonth(year, month);
+    const startDay = getFirstDayOfMonth(year, month);
+    
+    const days = [];
+    // Padding
+    for (let i = 0; i < startDay; i++) {
+        days.push(null);
+    }
+    // Days
+    for (let i = 1; i <= daysInMonth; i++) {
+        days.push(new Date(year, month, i));
+    }
+    return days;
+  }, [currentCalendarDate]);
+
+  const getSubscriptionsForDate = (date: Date) => {
+    const dateStr = date.toISOString().split('T')[0];
+    return subscriptions.filter(sub => sub.nextRenewalDate === dateStr);
+  };
+
 
   const getCategoryColor = (cat: string) => {
-    // Legacy support logic moved to constants, but for UI rendering we might need inline style
     const hex = getCategoryColorHex(cat);
-    return { color: hex, backgroundColor: `${hex}20` }; // 20 is approx 12% opacity hex
+    return { color: hex, backgroundColor: `${hex}20` }; 
   };
 
   const handleEdit = (sub: Subscription, e: React.MouseEvent) => {
@@ -251,6 +289,9 @@ export const Dashboard: React.FC = () => {
     : 0;
   const isOverBudget = budgetPercentage > 100;
 
+  // Privacy style
+  const privacyClass = user.privacyMode ? 'blur-md select-none' : '';
+
   return (
     <div className="p-6 lg:p-10 max-w-[1440px] mx-auto space-y-8" onClick={() => setOpenMenuId(null)}>
       
@@ -260,6 +301,15 @@ export const Dashboard: React.FC = () => {
            <h1 className="text-3xl font-bold text-white tracking-tight">{t('dashboard')}</h1>
         </div>
         <div className="flex items-center gap-4 w-full md:w-auto">
+           {/* Privacy Toggle */}
+           <button 
+             onClick={togglePrivacyMode}
+             className="p-2.5 bg-surface border border-white/10 rounded-lg text-gray-400 hover:text-white transition-colors"
+             title={user.privacyMode ? t('privacy_mode_off') : t('privacy_mode_on')}
+           >
+              {user.privacyMode ? <EyeOff size={20} /> : <Eye size={20} />}
+           </button>
+
            <div className="relative flex-1 md:min-w-[300px]">
              <input 
                type="text" 
@@ -279,7 +329,8 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* KPI & Chart Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* ... (KPI Cards remain same as previous, omitting for brevity to focus on new changes but preserving structure) ... */}
+       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Column 1: KPIs */}
         <div className="lg:col-span-1 flex flex-col gap-6">
            {/* Total Spend Card */}
@@ -291,7 +342,9 @@ export const Dashboard: React.FC = () => {
                  <p className="text-gray-400 font-medium">{t('monthly_total')}</p>
               </div>
               <div className="relative z-10 mb-4">
-                <h3 className="text-4xl font-bold text-white">{totalMonthlySpend.toFixed(2)} {currencySymbol}</h3>
+                <h3 className={`text-4xl font-bold text-white transition-all ${privacyClass}`}>
+                    {totalMonthlySpend.toFixed(2)} {currencySymbol}
+                </h3>
               </div>
 
               {/* Budget Progress Bar */}
@@ -312,11 +365,12 @@ export const Dashboard: React.FC = () => {
                    <div className="mt-1 text-right">
                       {isOverBudget ? (
                          <p className="text-[10px] text-red-400 font-bold flex items-center justify-end gap-1">
-                           <AlertTriangle size={10} /> {t('budget_alert', { amount: `${(totalMonthlySpend - user.monthlyBudget).toFixed(0)} ${currencySymbol}` })}
+                           <AlertTriangle size={10} /> 
+                           <span className={privacyClass}>{t('budget_alert', { amount: `${(totalMonthlySpend - user.monthlyBudget).toFixed(0)} ${currencySymbol}` })}</span>
                          </p>
                       ) : (
                          <p className="text-[10px] text-gray-500">
-                           {t('budget_left', { amount: `${(user.monthlyBudget - totalMonthlySpend).toFixed(0)} ${currencySymbol}` })}
+                           <span className={privacyClass}>{t('budget_left', { amount: `${(user.monthlyBudget - totalMonthlySpend).toFixed(0)} ${currencySymbol}` })}</span>
                          </p>
                       )}
                    </div>
@@ -356,8 +410,19 @@ export const Dashboard: React.FC = () => {
                 {currentUpcoming ? (
                    <div className="w-full flex items-center justify-between animate-fade-in">
                       <div className="flex items-center gap-3">
-                         <div className="w-10 h-10 rounded-lg bg-dark border border-white/10 text-white flex items-center justify-center font-bold text-sm flex-shrink-0">
-                           {currentUpcoming.name.charAt(0)}
+                         <div className="w-10 h-10 rounded-lg bg-dark border border-white/10 text-white flex items-center justify-center font-bold text-sm flex-shrink-0 overflow-hidden">
+                            <img 
+                                src={getBrandLogo(currentUpcoming.name)} 
+                                alt={currentUpcoming.name}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                    (e.target as HTMLImageElement).style.display = 'none';
+                                    (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                                }}
+                            />
+                            <div className="hidden w-full h-full flex items-center justify-center bg-dark text-white font-bold">
+                                {currentUpcoming.name.charAt(0)}
+                            </div>
                          </div>
                          <div>
                             <p className="text-white font-bold text-lg truncate max-w-[120px]">{currentUpcoming.name}</p>
@@ -367,9 +432,13 @@ export const Dashboard: React.FC = () => {
                          </div>
                       </div>
                       <div className="text-right">
-                         <p className="text-2xl font-bold text-white">{currentUpcoming.price} <span className="text-xs text-gray-400 font-normal">{currentUpcoming.currency}</span></p>
-                         {currentUpcoming.currency !== user.currency && (
-                             <p className="text-xs text-gray-500">≈ {convertAmount(currentUpcoming.price, currentUpcoming.currency).toFixed(2)} {currencySymbol}</p>
+                         <p className={`text-2xl font-bold text-white ${privacyClass}`}>
+                            {calculateMyShare(currentUpcoming).toFixed(2)} <span className="text-xs text-gray-400 font-normal">{currentUpcoming.currency}</span>
+                         </p>
+                         {currentUpcoming.sharedWith && currentUpcoming.sharedWith > 0 && (
+                             <p className="text-[10px] text-primary flex items-center justify-end gap-1">
+                                <Users size={10} /> {t('my_share')}
+                             </p>
                          )}
                       </div>
                    </div>
@@ -394,12 +463,11 @@ export const Dashboard: React.FC = () => {
            </div>
         </div>
 
-        {/* Column 2: Chart (Span 2) */}
         <div className="lg:col-span-2 bg-surface border border-white/10 rounded-2xl p-6 flex flex-col">
            <div className="flex justify-between items-center mb-6">
              <div>
                <p className="text-gray-400 font-medium">{t('spending_reports')}</p>
-               <h3 className="text-2xl font-bold text-white mt-1">
+               <h3 className={`text-2xl font-bold text-white mt-1 ${privacyClass}`}>
                  {chartDisplayTotal.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currencySymbol}
                  <span className="text-sm font-normal text-gray-500 ml-2">
                    / {chartView === 'monthly' ? t('this_year') : t('next_5_years')}
@@ -422,7 +490,7 @@ export const Dashboard: React.FC = () => {
              </div>
            </div>
            
-           <div className="flex-1 min-h-[180px]">
+           <div className={`flex-1 min-h-[180px] ${user.privacyMode ? 'opacity-50 blur-sm pointer-events-none' : ''}`}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData}>
                   <XAxis 
@@ -440,6 +508,7 @@ export const Dashboard: React.FC = () => {
                   <Bar 
                     dataKey="value" 
                     fill="#8A2BE2" 
+                    style={{ fill: 'rgba(var(--color-primary), 1)' }}
                     radius={[4, 4, 4, 4]} 
                     barSize={chartView === 'monthly' ? 16 : 32}
                   />
@@ -481,14 +550,23 @@ export const Dashboard: React.FC = () => {
             <button 
               onClick={() => setViewMode('grid')}
               className={`p-2 rounded-lg transition-colors ${viewMode === 'grid' ? 'bg-primary text-white' : 'bg-surface border border-white/10 text-gray-400 hover:text-white'}`}
+              title={t('view_grid')}
             >
                <Grid size={20} />
             </button>
             <button 
               onClick={() => setViewMode('list')}
               className={`p-2 rounded-lg transition-colors ${viewMode === 'list' ? 'bg-primary text-white' : 'bg-surface border border-white/10 text-gray-400 hover:text-white'}`}
+              title={t('view_list')}
             >
                <ListIcon size={20} />
+            </button>
+            <button 
+              onClick={() => setViewMode('calendar')}
+              className={`p-2 rounded-lg transition-colors ${viewMode === 'calendar' ? 'bg-primary text-white' : 'bg-surface border border-white/10 text-gray-400 hover:text-white'}`}
+              title={t('view_calendar')}
+            >
+               <CalendarDays size={20} />
             </button>
          </div>
       </div>
@@ -522,20 +600,35 @@ export const Dashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Subscriptions Content */}
-      {viewMode === 'grid' ? (
+      {/* --- CONTENT AREA START --- */}
+      
+      {/* 1. GRID VIEW */}
+      {viewMode === 'grid' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {processedSubscriptions.map(sub => {
             const status = getStatus(sub.nextRenewalDate);
             const catStyle = getCategoryColor(sub.category);
+            const isShared = sub.sharedWith && sub.sharedWith > 0;
+            const myShare = calculateMyShare(sub);
+
             return (
             <div key={sub.id} className="bg-surface border border-white/10 rounded-2xl p-5 hover:border-primary/50 hover:shadow-2xl hover:shadow-primary/10 transition-all group relative animate-fade-in">
                 <div className="flex justify-between items-start mb-4">
-                  <div className="w-12 h-12 bg-dark rounded-xl flex items-center justify-center text-xl font-bold text-white border border-white/5">
-                      {sub.name.charAt(0)}
+                  <div className="w-12 h-12 bg-dark rounded-xl flex items-center justify-center text-xl font-bold text-white border border-white/5 overflow-hidden">
+                       <img 
+                          src={getBrandLogo(sub.name)} 
+                          alt={sub.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none';
+                              (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                          }}
+                       />
+                       <div className="hidden w-full h-full flex items-center justify-center bg-dark text-white font-bold">
+                          {sub.name.charAt(0)}
+                       </div>
                   </div>
                   <div className="flex items-center gap-2 relative">
-                      {/* Status Badge */}
                       {status === 'active' ? (
                           <div className="px-2 py-0.5 rounded bg-green-500/10 border border-green-500/20 text-[10px] font-bold text-green-400 uppercase">
                              {t('active')}
@@ -581,9 +674,18 @@ export const Dashboard: React.FC = () => {
                 <div>
                   <h4 className="text-lg font-bold text-white truncate">{sub.name}</h4>
                   <div className="flex flex-col">
-                     <span className="text-sm text-gray-400">{sub.price} {sub.currency || CURRENCY_SYMBOLS['TRY']} / {sub.cycle === 'quarterly' ? t('quarterly') : sub.cycle === 'monthly' ? t('monthly') : t('yearly')}</span>
-                     {sub.currency !== user.currency && (
-                         <span className="text-xs text-gray-500 mt-0.5">≈ {convertAmount(sub.price, sub.currency).toFixed(2)} {currencySymbol}</span>
+                     <span className={`text-sm text-gray-400 ${privacyClass}`}>
+                        {sub.price} {sub.currency || CURRENCY_SYMBOLS['TRY']} / {sub.cycle === 'quarterly' ? t('quarterly') : sub.cycle === 'monthly' ? t('monthly') : t('yearly')}
+                     </span>
+                     
+                     {isShared ? (
+                        <div className={`text-xs text-primary font-medium mt-0.5 flex items-center gap-1 ${privacyClass}`}>
+                            <Users size={10} /> {t('my_share')}: {myShare.toFixed(2)} {sub.currency}
+                        </div>
+                     ) : (
+                        sub.currency !== user.currency && (
+                             <span className={`text-xs text-gray-500 mt-0.5 ${privacyClass}`}>≈ {convertAmount(sub.price, sub.currency).toFixed(2)} {currencySymbol}</span>
+                        )
                      )}
                   </div>
                 </div>
@@ -617,8 +719,10 @@ export const Dashboard: React.FC = () => {
               </div>
           </button>
         </div>
-      ) : (
-        /* LIST VIEW */
+      )}
+      
+      {/* 2. LIST VIEW */}
+      {viewMode === 'list' && (
         <div className="bg-surface border border-white/10 rounded-2xl overflow-hidden animate-fade-in">
            <div className="overflow-x-auto">
              <table className="w-full text-left text-sm">
@@ -635,11 +739,25 @@ export const Dashboard: React.FC = () => {
                  {processedSubscriptions.map(sub => {
                    const status = getStatus(sub.nextRenewalDate);
                    const catStyle = getCategoryColor(sub.category);
+                   const isShared = sub.sharedWith && sub.sharedWith > 0;
+                   const myShare = calculateMyShare(sub);
+                   
                    return (
                    <tr key={sub.id} className="hover:bg-white/5 transition-colors">
                      <td className="px-6 py-4 font-medium text-white flex items-center gap-3">
-                        <div className="w-8 h-8 bg-dark rounded-lg flex items-center justify-center text-white font-bold border border-white/10">
-                          {sub.name.charAt(0)}
+                        <div className="w-8 h-8 bg-dark rounded-lg flex items-center justify-center text-white font-bold border border-white/10 overflow-hidden">
+                           <img 
+                              src={getBrandLogo(sub.name)} 
+                              alt={sub.name}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = 'none';
+                                  (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                              }}
+                           />
+                           <div className="hidden w-full h-full flex items-center justify-center bg-dark text-white font-bold">
+                              {sub.name.charAt(0)}
+                           </div>
                         </div>
                         <div className="flex flex-col">
                              <span>{sub.name}</span>
@@ -657,11 +775,17 @@ export const Dashboard: React.FC = () => {
                        </span>
                      </td>
                      <td className="px-6 py-4 text-white font-medium">
-                       <div>
+                       <div className={privacyClass}>
                          {sub.price} {sub.currency || CURRENCY_SYMBOLS['TRY']} <span className="text-gray-500 text-xs font-normal">/ {sub.cycle === 'quarterly' ? t('quarterly') : sub.cycle === 'monthly' ? t('monthly') : t('yearly')}</span>
                        </div>
-                       {sub.currency !== user.currency && (
-                           <div className="text-xs text-gray-500 mt-0.5">≈ {convertAmount(sub.price, sub.currency).toFixed(2)} {currencySymbol}</div>
+                       {isShared ? (
+                         <div className={`text-xs text-primary font-bold mt-0.5 flex items-center gap-1 ${privacyClass}`}>
+                            <Users size={10} /> {myShare.toFixed(2)} {sub.currency}
+                         </div>
+                       ) : (
+                         sub.currency !== user.currency && (
+                             <div className={`text-xs text-gray-500 mt-0.5 ${privacyClass}`}>≈ {convertAmount(sub.price, sub.currency).toFixed(2)} {currencySymbol}</div>
+                         )
                        )}
                      </td>
                      <td className="px-6 py-4 text-gray-400">
@@ -718,6 +842,77 @@ export const Dashboard: React.FC = () => {
         </div>
       )}
 
+      {/* 3. CALENDAR VIEW */}
+      {viewMode === 'calendar' && (
+         <div className="bg-surface border border-white/10 rounded-2xl p-6 animate-fade-in">
+             <div className="flex items-center justify-between mb-6">
+                 <h3 className="text-xl font-bold text-white flex items-center gap-2 capitalize">
+                     {currentCalendarDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
+                 </h3>
+                 <div className="flex bg-dark rounded-lg p-1 border border-white/5">
+                     <button 
+                        onClick={() => setCurrentCalendarDate(new Date(currentCalendarDate.getFullYear(), currentCalendarDate.getMonth() - 1, 1))}
+                        className="p-2 hover:text-white text-gray-400 transition-colors"
+                     >
+                         <ChevronLeft size={20} />
+                     </button>
+                     <button 
+                        onClick={() => setCurrentCalendarDate(new Date())}
+                        className="px-3 py-2 text-xs font-bold text-gray-400 hover:text-white transition-colors"
+                     >
+                         {t('today') || 'Bugün'}
+                     </button>
+                     <button 
+                        onClick={() => setCurrentCalendarDate(new Date(currentCalendarDate.getFullYear(), currentCalendarDate.getMonth() + 1, 1))}
+                        className="p-2 hover:text-white text-gray-400 transition-colors"
+                     >
+                         <ChevronRight size={20} />
+                     </button>
+                 </div>
+             </div>
+
+             <div className="grid grid-cols-7 gap-2 mb-2">
+                 {['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'].map(d => (
+                     <div key={d} className="text-center text-xs font-bold text-gray-500 uppercase py-2">
+                         {d}
+                     </div>
+                 ))}
+             </div>
+             
+             <div className="grid grid-cols-7 gap-2 auto-rows-[100px]">
+                 {calendarDays.map((date, idx) => {
+                     if (!date) return <div key={idx} className="bg-transparent" />;
+                     
+                     const isToday = date.toDateString() === new Date().toDateString();
+                     const daySubs = getSubscriptionsForDate(date);
+                     
+                     return (
+                         <div key={idx} className={`bg-dark border rounded-xl p-2 relative overflow-hidden transition-all ${isToday ? 'border-primary/50 ring-1 ring-primary/50' : 'border-white/5 hover:border-white/20'}`}>
+                             <span className={`text-sm font-medium ${isToday ? 'text-primary' : 'text-gray-400'}`}>
+                                 {date.getDate()}
+                             </span>
+                             
+                             <div className="mt-1 space-y-1 max-h-[70px] overflow-y-auto custom-scrollbar">
+                                 {daySubs.map(sub => (
+                                     <div key={sub.id} className="flex items-center gap-1.5 bg-white/5 rounded p-1" title={sub.name}>
+                                         <div className="w-3 h-3 rounded-full overflow-hidden flex-shrink-0">
+                                            <img src={getBrandLogo(sub.name)} alt="" className="w-full h-full object-cover" />
+                                         </div>
+                                         <span className="text-[10px] text-gray-300 truncate">{sub.name}</span>
+                                         <span className={`text-[10px] text-white ml-auto ${privacyClass}`}>
+                                            {convertAmount(calculateMyShare(sub), sub.currency).toFixed(0)}
+                                         </span>
+                                     </div>
+                                 ))}
+                             </div>
+                         </div>
+                     );
+                 })}
+             </div>
+         </div>
+      )}
+
+      {/* Modals */}
       <AddSubscriptionModal 
         isOpen={isAddModalOpen} 
         onClose={() => setIsAddModalOpen(false)} 

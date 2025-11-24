@@ -3,14 +3,15 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
-import { Trash2, Search, Filter, Pencil, AlertTriangle, CheckCircle, Clock, History } from 'lucide-react';
-import { CURRENCY_SYMBOL, getCategoryColorHex } from '../constants';
+import { Trash2, Search, Filter, Pencil, AlertTriangle, CheckCircle, Clock, History, Users, CalendarPlus, HelpCircle } from 'lucide-react';
+import { CURRENCY_SYMBOL, getCategoryColorHex, getBrandLogo } from '../constants';
 import { BillingCycle, Subscription, DefaultCategory } from '../types';
 import { AddSubscriptionModal } from '../components/AddSubscriptionModal';
 import { PaymentHistoryModal } from '../components/PaymentHistoryModal';
+import { CancellationModal } from '../components/CancellationModal';
 
 export const Subscriptions: React.FC = () => {
-  const { subscriptions, removeSubscription, renewSubscription, t, categories, user, convertAmount, currencySymbol } = useApp();
+  const { subscriptions, removeSubscription, renewSubscription, t, categories, user, convertAmount, currencySymbol, calculateMyShare, downloadCalendarEvent } = useApp();
   const { addToast } = useToast();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -22,6 +23,9 @@ export const Subscriptions: React.FC = () => {
   const [subscriptionToEdit, setSubscriptionToEdit] = useState<Subscription | null>(null);
   const [deleteConfirmationId, setDeleteConfirmationId] = useState<string | null>(null);
   const [historySub, setHistorySub] = useState<Subscription | null>(null);
+  
+  // New States for Cancellation
+  const [cancelGuideSub, setCancelGuideSub] = useState<Subscription | null>(null);
 
   const filteredSubscriptions = subscriptions.filter(sub => {
     const matchesSearch = sub.name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -51,6 +55,11 @@ export const Subscriptions: React.FC = () => {
       renewSubscription(sub.id);
       addToast(t('renewal_success', { services: sub.name }), 'success');
   };
+  
+  const handleAddToCalendar = (sub: Subscription) => {
+      downloadCalendarEvent(sub);
+      addToast('Takvim dosyası indirildi (.ics)', 'success');
+  };
 
   // Status Helper
   const getStatus = (date: string) => {
@@ -68,6 +77,8 @@ export const Subscriptions: React.FC = () => {
     const hex = getCategoryColorHex(cat);
     return { color: hex, backgroundColor: `${hex}20` };
   };
+  
+  const privacyClass = user.privacyMode ? 'blur-md select-none' : '';
 
   return (
     <div className="p-6 md:p-10 max-w-5xl mx-auto">
@@ -133,12 +144,26 @@ export const Subscriptions: React.FC = () => {
             {filteredSubscriptions.map(sub => {
               const status = getStatus(sub.nextRenewalDate);
               const catStyle = getCategoryColor(sub.category);
+              const isShared = sub.sharedWith && sub.sharedWith > 0;
+              const myShare = calculateMyShare(sub);
+              
               return (
               <tr key={sub.id} className="hover:bg-white/5 transition-colors">
                 <td className="p-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-dark border border-white/10 text-white flex items-center justify-center font-bold text-xs">
-                      {sub.name.charAt(0)}
+                    <div className="w-8 h-8 rounded-lg bg-dark border border-white/10 text-white flex items-center justify-center font-bold text-xs overflow-hidden">
+                       <img 
+                          src={getBrandLogo(sub.name)} 
+                          alt={sub.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none';
+                              (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                          }}
+                       />
+                       <div className="hidden w-full h-full flex items-center justify-center bg-dark text-white font-bold">
+                          {sub.name.charAt(0)}
+                       </div>
                     </div>
                     <div className="flex flex-col">
                         <span className="font-bold text-white">{sub.name}</span>
@@ -160,11 +185,17 @@ export const Subscriptions: React.FC = () => {
                   )}
                 </td>
                 <td className="p-4 font-medium text-white">
-                  <div>
+                  <div className={privacyClass}>
                     {sub.price} {sub.currency || CURRENCY_SYMBOL}
                   </div>
-                  {sub.currency !== user.currency && (
-                      <div className="text-xs text-gray-500 mt-0.5">≈ {convertAmount(sub.price, sub.currency).toFixed(2)} {currencySymbol}</div>
+                  {isShared ? (
+                     <div className={`text-xs text-primary font-bold mt-0.5 flex items-center gap-1 ${privacyClass}`}>
+                         <Users size={10} /> {myShare.toFixed(2)} {sub.currency}
+                     </div>
+                  ) : (
+                     sub.currency !== user.currency && (
+                        <div className={`text-xs text-gray-500 mt-0.5 ${privacyClass}`}>≈ {convertAmount(sub.price, sub.currency).toFixed(2)} {currencySymbol}</div>
+                     )
                   )}
                 </td>
                 <td className="p-4 text-gray-400 text-sm capitalize">
@@ -183,6 +214,17 @@ export const Subscriptions: React.FC = () => {
                             {t('pay_now')}
                         </button>
                     )}
+                    
+                    {/* Add to Calendar Button */}
+                    <button 
+                      onClick={() => handleAddToCalendar(sub)}
+                      className="text-gray-500 hover:text-green-400 transition-colors p-2 bg-white/5 rounded-lg hover:bg-white/10"
+                      title={t('add_to_calendar')}
+                    >
+                       <CalendarPlus size={16} />
+                    </button>
+                    
+                    {/* History */}
                     <button 
                       onClick={() => setHistorySub(sub)}
                       className="text-gray-500 hover:text-indigo-400 transition-colors p-2 bg-white/5 rounded-lg hover:bg-white/10"
@@ -190,6 +232,16 @@ export const Subscriptions: React.FC = () => {
                     >
                       <History size={16} />
                     </button>
+
+                    {/* How to Cancel */}
+                    <button 
+                      onClick={() => setCancelGuideSub(sub)}
+                      className="text-gray-500 hover:text-red-300 transition-colors p-2 bg-white/5 rounded-lg hover:bg-white/10"
+                      title={t('how_to_cancel')}
+                    >
+                       <HelpCircle size={16} />
+                    </button>
+                    
                     <button 
                       onClick={() => handleEdit(sub)}
                       className="text-gray-500 hover:text-white transition-colors p-2 bg-white/5 rounded-lg hover:bg-white/10"
@@ -232,6 +284,15 @@ export const Subscriptions: React.FC = () => {
         onClose={() => setHistorySub(null)}
         subscription={historySub}
       />
+      
+      {/* Cancellation Guide Modal */}
+      {cancelGuideSub && (
+          <CancellationModal 
+             isOpen={!!cancelGuideSub}
+             onClose={() => setCancelGuideSub(null)}
+             serviceName={cancelGuideSub.name}
+          />
+      )}
 
       {/* Delete Confirmation Modal */}
       {deleteConfirmationId && (
